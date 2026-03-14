@@ -289,10 +289,12 @@ app.mount("/", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
+    # Cloud Run injects K_SERVICE to distinguish from local environments
+    is_prod = os.getenv("K_SERVICE") is not None
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=int(os.getenv("PORT", "8000")),
-        reload=True,
+        reload=not is_prod,
         log_level="info",
     )
