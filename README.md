@@ -44,24 +44,27 @@ The AI provides differential diagnoses, severity assessments, drug interaction c
 
 ## 🏗️ Architecture
 
+## 🏗️ Architecture
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    Browser (Web App)                 │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
 │  │ Webcam   │  │ Mic      │  │ Clinical Insights  │  │
-│  │ (JPEG)   │  │ (PCM     │  │ Panel              │  │
+│  │ (JPEG)   │  │ (PCM     │  │ & PDF Exporter     │  │
 │  │          │  │  16kHz)  │  │                    │  │
 │  └────┬─────┘  └────┬─────┘  └───────────▲────────┘  │
 │       │              │                    │           │
 │       └──────┬───────┘                    │           │
 │              ▼                            │           │
-│       ┌──────────────┐                    │           │
-│       │  WebSocket   │◄───────────────────┘           │
-│       │  Client      │                                │
-│       └──────┬───────┘                                │
-└──────────────┼────────────────────────────────────────┘
-               │ WebSocket (wss://)
-               ▼
+│       ┌──────────────┐             ┌──────▼───────┐   │
+│       │  WebSocket   │◄────────────┤ REST API     │   │
+│       │  Client      │             │  Clients     │   │
+│       └──────┬───────┘             └──────┬───────┘   │
+└──────────────┼────────────────────────────┼───────────┘
+               │ WebSocket (wss://)         │ HTTP (POST)
+               │                            │
+               ▼                            ▼
 ┌──────────────────────────────────────────────────────┐
 │           FastAPI Backend (Cloud Run)                 │
 │  ┌───────────────────────────────────────────────┐   │
@@ -75,16 +78,18 @@ The AI provides differential diagnoses, severity assessments, drug interaction c
 │  │  │ SDK          │  │ (agent_tools.py)        │  │   │
 │  │  └──────┬──────┘  └──────────┬─────────────┘  │   │
 │  └─────────┼────────────────────┼────────────────┘   │
-└────────────┼────────────────────┼────────────────────┘
-             │                    │
-             ▼                    ▼
-    ┌────────────────┐   ┌───────────────────────┐
-    │ Gemini Live API│   │ Clinical Agent Tools   │
-    │ (gemini-2.5-   │   │ • analyze_symptom      │
-    │  flash-native- │   │ • drug_interactions    │
-    │  audio-dialog) │   │ • clinical_guidelines  │
-    └────────────────┘   │ • risk_assessment      │
-                         └───────────────────────┘
+│            │                    │                     │
+│  ┌─────────▼────────────────────▼───────────────┐    │
+│  │         OCR & Report Generators (REST)       │◄───┘
+│  └──────────────────┬───────────────────────────┘    │
+└─────────────────────┼────────────────────────────────┘
+                      │
+                      ▼
+    ┌─────────────────┴───────────────┐
+    │          Gemini APIs            │
+    │ • gemini-2.5-flash-native-audio │
+    │ • gemini-2.5-flash (OCR/Reports)│
+    └─────────────────────────────────┘
 ```
 
 ---
@@ -113,18 +118,25 @@ The AI provides differential diagnoses, severity assessments, drug interaction c
 - 🔊 **Voice output** — AI responds with natural speech
 - ⚡ **Barge-in** — interrupt the AI at any time
 
+### 🚀 The "Beyond Text" Factor (Hackathon Alignment)
+This project breaks the "text box" paradigm completely. It acts as a **true Live Agent** for clinical environments where hands are often sterilized or busy. The interaction is fully natural:
+- The agent "Sees, Hears, and Speaks" via Gemini's multimodal Live API.
+- Interruptions (barge-in) are handled gracefully (e.g., "Wait, they are allergic to penicillin").
+- Seamlessly weaves real-time video observation with medical fact-checking.
+
 ### Clinical Agent Tools
 - 🔬 **Symptom Analysis** — differential diagnoses from visual observation
 - 💊 **Drug Interactions** — safety checks with allergy awareness
 - 📋 **Clinical Guidelines** — evidence-based treatment protocols
 - ⚠️ **Risk Assessment** — severity scoring with triage recommendations
+- 📄 **Prescription OCR** — Upload past slips; Gemini reads the handwriting and injects it as context.
+- 🖨️ **Automated PDF Reports** — At the end of the session, the app summarizes the live audio transcript into a cleanly formatted, printable clinical prescription.
 
 ### Premium UI
 - 🌙 Dark medical theme with glassmorphism
 - 📊 Real-time confidence bars for diagnoses
-- 🚦 Color-coded risk level banners
-- 💬 Live conversation transcript
-- 🎵 Audio waveform visualizer
+- 💬 Concurrent streaming bubbles for Doctor & AI transcripts
+- 🖨️ Zero-click print stylesheets (Converts to Medical Letterhead on PDF export)
 
 ---
 
@@ -274,15 +286,21 @@ gcloud run deploy medisight \
 
 | Requirement | Status | Implementation |
 |-------------|--------|---------------|
-| Uses a Gemini model | ✅ | `gemini-2.5-flash-preview-native-audio-dialog` |
+| Uses a Gemini model | ✅ | `gemini-2.5-flash-native-audio-latest` & `gemini-2.5-flash` |
 | Uses Gemini Live API | ✅ | Real-time WebSocket session via `google-genai` SDK |
-| Uses Google GenAI SDK | ✅ | `google-genai` Python SDK for session management |
+| Uses Google GenAI SDK | ✅ | `google-genai` Python SDK for session and REST OCR management |
 | Uses Google Cloud service | ✅ | Cloud Run, Cloud Build, Container Registry |
-| Multimodal interaction | ✅ | Voice (mic) + Vision (webcam) + AI speech output |
+| Multimodal interaction | ✅ | Voice (mic) + Vision (webcam) + Images (uploads) + AI speech output |
 | Live Agent with natural speech | ✅ | Full-duplex audio conversation |
 | Supports interruption (barge-in) | ✅ | Built-in Gemini Live API barge-in support |
-| Backend hosted on Google Cloud | ✅ | Deployed on Cloud Run |
-| New project for hackathon | ✅ | Built from scratch |
+| Backend hosted on Google Cloud | ✅ | Deployed on Cloud Run serving the frontend static files |
+| New project for hackathon | ✅ | Built entirely from scratch |
+
+### Proof of Google Cloud Deployment
+Inside our repository, the `infrastructure/cloudbuild.yaml` and `infrastructure/deploy.sh` files demonstrate our automated deployment process directly to Google Cloud Run. The live demo is hosted on a GCP Cloud Run HTTPS endpoint. 
+
+### Demonstration Video
+*(Hackathon note: Include your max 4-minute YouTube/Vimeo video here showcasing the Live Agent features without mockups).*
 
 ---
 

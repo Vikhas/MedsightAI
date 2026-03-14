@@ -50,6 +50,24 @@ const elements = {
     guidelinesInfo: document.getElementById('guidelinesInfo'),
     insightsEmpty: document.getElementById('insightsEmpty'),
     disclaimer: document.getElementById('disclaimer'),
+
+    // Modals
+    loginOverlay: document.getElementById('loginOverlay'),
+    loginBtn: document.getElementById('loginBtn'),
+    doctorName: document.getElementById('doctorName'),
+    patientSetupModal: document.getElementById('patientSetupModal'),
+    prescriptionFile: document.getElementById('prescriptionFile'),
+    uploadArea: document.getElementById('uploadArea'),
+    ocrLoading: document.getElementById('ocrLoading'),
+    contextPreview: document.getElementById('contextPreview'),
+    patientContextText: document.getElementById('patientContextText'),
+    skipSetupBtn: document.getElementById('skipSetupBtn'),
+    startSessionBtn: document.getElementById('startSessionBtn'),
+
+    // Dashboards widgets
+    activeContextSection: document.getElementById('activeContextSection'),
+    activeContextText: document.getElementById('activeContextText'),
+    exportReportBtn: document.getElementById('exportReportBtn'),
 };
 
 // ---------------------------------------------------------------------------
@@ -61,6 +79,7 @@ const media = new MediaHandler();
 
 let state = 'idle'; // idle | connecting | connected
 let lastAssistantBubble = null; // tracks the current streaming assistant bubble
+let lastUserBubble = null; // tracks the current streaming user bubble
 
 // ---------------------------------------------------------------------------
 // UI Helpers
@@ -101,8 +120,11 @@ function setConnectionState(newState) {
             break;
     }
 }
+function addMessage(rawRole, text) {
+    // Normalize role string (Gemini sometimes uses "model" instead of "assistant", or capitalized letters)
+    let role = (rawRole || 'system').toLowerCase();
+    if (role === 'model') role = 'assistant';
 
-function addMessage(role, text) {
     // Remove welcome message if present
     const welcome = elements.transcriptMessages.querySelector('.welcome-message');
     if (welcome) welcome.remove();
@@ -124,8 +146,9 @@ function addMessage(role, text) {
     } else {
         // System message
         lastAssistantBubble = null;
+        lastUserBubble = null;
         const bubble = document.createElement('div');
-        bubble.className = 'message-bubble';
+        bubble.className = 'message-bubble system-bubble';
         bubble.textContent = text;
         wrapper.appendChild(bubble);
         elements.transcriptMessages.appendChild(wrapper);
@@ -145,25 +168,39 @@ function addMessage(role, text) {
     elements.transcriptMessages.appendChild(wrapper);
     scrollToBottom();
 
-    // Track for streaming accumulation
+    // Track for streaming accumulation. Do NOT nullify the other role's bubble,
+    // as Gemini streams user and assistant transcripts concurrently in the same payload!
     if (role === 'assistant') {
         lastAssistantBubble = bubble;
+    } else if (role === 'user') {
+        lastUserBubble = bubble;
     }
 }
 
 /**
- * Append text to the current assistant message bubble,
+ * Append text to the current message bubble for the given role,
  * or create a new one if none exists. This handles
  * streaming transcript chunks properly so each response
  * is one continuous message instead of many small bubbles.
  */
-function appendAssistantText(text) {
-    if (lastAssistantBubble) {
-        lastAssistantBubble.dataset.rawText += text;
-        lastAssistantBubble.innerHTML = parseMarkdown(lastAssistantBubble.dataset.rawText);
+function appendStreamingText(rawRole, text) {
+    let role = (rawRole || 'system').toLowerCase();
+    if (role === 'model') role = 'assistant';
+
+    let targetBubble = role === 'assistant' ? lastAssistantBubble : lastUserBubble;
+    
+    if (targetBubble) {
+        if (role === 'user') {
+            // User transcripts (from Gemini input_transcription) are accumulative over the turn.
+            targetBubble.dataset.rawText = text;
+        } else {
+            // Assistant transcripts (from part.text or output_transcription) are chunked.
+            targetBubble.dataset.rawText += text;
+        }
+        targetBubble.innerHTML = parseMarkdown(targetBubble.dataset.rawText);
         scrollToBottom();
     } else {
-        addMessage('assistant', text);
+        addMessage(role, text);
     }
 }
 
@@ -419,13 +456,28 @@ async function connect() {
         // Small delay to let cleanup finish
         await new Promise(r => setTimeout(r, 200));
 
-        // Connect WebSocket
+        // Connect WebSocket (this now sends the setup message)
         await client.connect();
+        
+        // Wait a tiny bit for the backend to process the setup message
+        // before we start bombarding it with audio/video frames
+        await new Promise(r => setTimeout(r, 100));
+        
+        setConnectionState('connected');
 
-        // Start media capture (fresh AudioContext each time)
+        // Populate patient context UI if we have it
+        if (window.currentPatientContext && window.currentPatientContext.trim() !== '') {
+            elements.activeContextText.innerHTML = parseMarkdown(window.currentPatientContext);
+            elements.activeContextSection.classList.remove('hidden');
+        } else {
+            elements.activeContextSection.classList.add('hidden');
+        }
+        elements.exportReportBtn.classList.remove('hidden');
+
+        // Start media capture
         await media.start(elements.webcamVideo);
 
-        // Wire up media → client
+        // Wire up media → client (only fires if state is connected)
         media.onAudioData = (base64) => {
             if (state === 'connected') client.sendAudio(base64);
         };
@@ -433,8 +485,6 @@ async function connect() {
         media.onVideoFrame = (base64) => {
             if (state === 'connected') client.sendVideo(base64);
         };
-
-        setConnectionState('connected');
         addMessage('system', 'Connected — speak naturally or type a message');
 
     } catch (err) {
@@ -451,6 +501,7 @@ function disconnect() {
     client.disconnect();
     setConnectionState('idle');
     lastAssistantBubble = null;
+    lastUserBubble = null;
     addMessage('system', 'Disconnected from MediSight AI');
 }
 
@@ -462,16 +513,10 @@ client.onAudio = (base64Audio) => {
     media.playAudio(base64Audio);
 };
 
-// Use appendAssistantText for streaming — accumulates into one bubble
+// Use appendStreamingText for both user and assistant — accumulates chunks into one bubble
 client.onTranscript = (role, text) => {
     if (!text || !text.trim()) return;
-
-    if (role === 'user') {
-        addMessage('user', text.trim());
-    } else {
-        // Assistant transcripts stream in chunks — accumulate them
-        appendAssistantText(text);
-    }
+    appendStreamingText(role, text);
 };
 
 client.onToolCall = (name, args) => {
@@ -516,6 +561,7 @@ client.onStatus = (status, message) => {
             client.disconnect();
             setConnectionState('idle');
             lastAssistantBubble = null;
+            lastUserBubble = null;
             addMessage('system', 'Session ended — click Connect to restart');
         }
     }
@@ -525,12 +571,14 @@ client.onStatus = (status, message) => {
 client.onTurnComplete = () => {
     console.log('[TurnComplete]');
     lastAssistantBubble = null; // next transcript starts a fresh bubble
+    lastUserBubble = null;
 };
 
 client.onInterrupted = () => {
     console.log('[Interrupted] — barge-in detected');
     media.stopPlayback();
     lastAssistantBubble = null;
+    lastUserBubble = null;
 };
 
 client.onError = (message) => {
@@ -565,6 +613,7 @@ elements.clearTranscriptBtn.addEventListener('click', () => {
     elements.transcriptMessages.innerHTML = '';
     clearInsights();
     lastAssistantBubble = null;
+    lastUserBubble = null;
     if (state === 'idle') {
         elements.transcriptMessages.innerHTML = `
             <div class="welcome-message">
@@ -630,6 +679,134 @@ function initVisualizer() {
 
     draw();
 }
+
+// ---------------------------------------------------------------------------
+// Doctor Login & Patient Setup Modal Logic
+// ---------------------------------------------------------------------------
+
+elements.loginBtn.addEventListener('click', () => {
+    if (elements.doctorName.value.trim() !== '') {
+        elements.loginOverlay.classList.add('hidden');
+        elements.patientSetupModal.classList.remove('hidden');
+    }
+});
+
+elements.uploadArea.addEventListener('click', () => elements.prescriptionFile.click());
+elements.uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    elements.uploadArea.classList.add('dragover');
+});
+elements.uploadArea.addEventListener('dragleave', () => elements.uploadArea.classList.remove('dragover'));
+elements.uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    elements.uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+        elements.prescriptionFile.files = e.dataTransfer.files;
+        handlePrescriptionUpload();
+    }
+});
+
+elements.prescriptionFile.addEventListener('change', handlePrescriptionUpload);
+
+elements.skipSetupBtn.addEventListener('click', () => {
+    elements.patientSetupModal.classList.add('hidden');
+});
+
+elements.startSessionBtn.addEventListener('click', () => {
+    window.currentPatientContext = elements.patientContextText.value;
+    elements.patientSetupModal.classList.add('hidden');
+});
+
+/**
+ * Handle Prescription Image Upload and OCR
+ */
+async function handlePrescriptionUpload() {
+    const file = elements.prescriptionFile.files[0];
+    if (!file) return;
+
+    // UI Updates
+    elements.uploadArea.style.display = 'none';
+    elements.ocrLoading.classList.remove('hidden');
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch('/api/extract_prescription', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        elements.ocrLoading.classList.add('hidden');
+        
+        if (data.error) {
+            console.error(data.error);
+            alert("Failed to extract context. Using default.");
+            elements.uploadArea.style.display = 'flex';
+        } else {
+            elements.contextPreview.classList.remove('hidden');
+            elements.patientContextText.value = data.text;
+            elements.startSessionBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error("OCR API error:", error);
+        elements.ocrLoading.classList.add('hidden');
+        elements.uploadArea.style.display = 'flex';
+    }
+}
+
+elements.exportReportBtn.addEventListener('click', async () => {
+    const btnText = elements.exportReportBtn.innerHTML;
+    elements.exportReportBtn.innerHTML = '<div class="spinner"></div> Generating Report...';
+    elements.exportReportBtn.disabled = true;
+
+    try {
+        const messages = Array.from(elements.transcriptMessages.querySelectorAll('.message-bubble'))
+            .map(b => {
+                const role = b.parentElement.classList.contains('user') ? 'Doctor' : 'Assistant';
+                return `${role}: ${b.dataset.rawText || b.textContent}`;
+            })
+            .join('\n');
+            
+        const patientContext = window.currentPatientContext || '';
+
+        const response = await fetch('/api/generate_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                transcript: messages,
+                patient_context: patientContext
+            })
+        });
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+
+        let printContainer = document.getElementById('print-summary-container');
+        if (!printContainer) {
+            printContainer = document.createElement('div');
+            printContainer.id = 'print-summary-container';
+            document.body.appendChild(printContainer);
+        }
+        
+        printContainer.innerHTML = data.report.replace(/\n/g, '<br>');
+        
+        document.body.classList.add('print-summary-mode');
+        window.print();
+        
+        setTimeout(() => {
+            document.body.classList.remove('print-summary-mode');
+        }, 1000);
+
+    } catch (e) {
+        console.error("Error generating report:", e);
+        alert("Failed to generate report.");
+    } finally {
+        elements.exportReportBtn.innerHTML = btnText;
+        elements.exportReportBtn.disabled = false;
+    }
+});
 
 // ---------------------------------------------------------------------------
 // Initialize

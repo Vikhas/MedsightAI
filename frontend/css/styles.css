@@ -1038,3 +1038,434 @@ body {
         transform: rotate(360deg);
     }
 }
+
+/* ======================================================================
+   Modals (Login & Patient Context)
+   ====================================================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 14, 23, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 1;
+    transition: opacity var(--transition-base);
+}
+
+.modal-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 480px;
+    padding: 32px;
+    box-shadow: var(--shadow-lg), var(--shadow-glow);
+    animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-header {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.modal-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.modal-body p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.input-group {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.input-group input {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
+}
+
+.primary-btn {
+    width: 100%;
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-md);
+}
+
+.primary-btn:hover:not(:disabled) {
+    box-shadow: var(--shadow-lg), var(--shadow-glow);
+    transform: translateY(-1px);
+}
+
+.primary-btn:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.secondary-btn {
+    width: 100%;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 14px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: all var(--transition-fast);
+}
+
+.secondary-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Patient Setup Modal specifics */
+.setup-modal {
+    max-width: 540px;
+}
+
+.upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: rgba(17, 24, 39, 0.2);
+    margin-bottom: 24px;
+}
+
+.upload-area:hover, .upload-area.dragover {
+    border-color: var(--accent-cyan);
+    background: rgba(0, 212, 255, 0.05);
+}
+
+.upload-area svg {
+    color: var(--accent-cyan);
+}
+
+.upload-area span {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.hidden-input {
+    display: none;
+}
+
+.ocr-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    color: var(--accent-cyan);
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+}
+
+.spinner.small {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+}
+
+.context-preview {
+    margin-bottom: 24px;
+}
+
+.context-preview h3 {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.context-preview textarea {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+}
+
+.context-preview textarea:focus {
+    border-color: var(--accent-purple);
+}
+
+.modal-footer {
+    display: flex;
+    gap: 16px;
+}
+
+.modal-footer .secondary-btn,
+.modal-footer .primary-btn {
+    margin-top: 0;
+}
+
+/* ======================================================================
+   Patient Context Display & Export Button
+   ====================================================================== */
+
+.context-text-display {
+    background: rgba(124, 58, 237, 0.1);
+    border-left: 3px solid var(--accent-purple);
+    padding: 12px 16px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 24px;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+#exportReportBtn {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+#exportReportBtn:hover {
+    background: rgba(0, 212, 255, 0.2);
+}
+
+#print-summary-container {
+    display: none;
+}
+
+/* ======================================================================
+   Print Media Query for PDF Export (Clinical Report Format)
+   ====================================================================== */
+
+@media print {
+    @page {
+        margin: 2cm;
+        size: letter;
+    }
+
+    body {
+        background: white !important;
+        color: black !important;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        font-size: 11pt;
+    }
+
+    /* Print Header - Medical Letterhead */
+    body::before {
+        content: "MediSight Clinical Report\A--------------------------------------------------------\ADate: " attr(data-date) "\APatient ID: Confidential";
+        white-space: pre-wrap;
+        display: block;
+        font-size: 16pt;
+        font-weight: bold;
+        margin-bottom: 30px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid black;
+        text-align: left;
+    }
+
+    /* Print Footer - Signature Line */
+    body::after {
+        content: "\A\A\A----------------------------------\AAttending Physician Signature";
+        white-space: pre-wrap;
+        display: block;
+        margin-top: 50px;
+        page-break-inside: avoid;
+    }
+
+    /* Hide UI controls and interactive panels */
+    .header, 
+    .video-panel, 
+    .transcript-controls, 
+    .panel-actions, 
+    .modal-overlay,
+    .message-avatar svg,
+    #clearTranscriptBtn {
+        display: none !important;
+    }
+
+    /* Hide the chat UI when printing summary */
+    body.print-summary-mode .main-content {
+        display: none !important;
+    }
+
+    /* Show the generated summary */
+    body.print-summary-mode #print-summary-container {
+        display: block !important;
+        white-space: pre-wrap;
+        font-size: 11pt;
+    }
+
+    /* Linearize the layout (if not in summary mode) */
+    .main-content {
+        display: block !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+
+    .panel {
+        background: white !important;
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 0 30px 0 !important;
+        height: auto !important;
+        page-break-inside: avoid;
+    }
+
+    /* Format Transcript as consultation notes */
+    .transcript-panel {
+        border-bottom: 1px solid #ccc !important;
+        padding-bottom: 20px !important;
+        page-break-after: auto;
+    }
+    
+    .transcript-messages {
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    .message {
+        margin-bottom: 10px !important;
+        page-break-inside: avoid;
+    }
+
+    .message-bubble {
+        background: none !important;
+        border: none !important;
+        padding: 0 !important;
+        color: black !important;
+        font-size: 11pt !important;
+    }
+
+    .message.user .message-bubble::before {
+        content: "Dr. Input: ";
+        font-weight: bold;
+    }
+
+    .message.assistant .message-bubble::before {
+        content: "AI Analysis: ";
+        font-weight: bold;
+    }
+
+    /* Format Insights Panel */
+    .insights-panel {
+        page-break-before: auto;
+    }
+
+    .insights-content {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+    }
+
+    .insight-section {
+        margin-bottom: 20px !important;
+        color: black !important;
+        page-break-inside: avoid;
+    }
+
+    h3.section-title {
+        font-size: 14pt !important;
+        border-bottom: 1px solid black;
+        padding-bottom: 5px;
+        margin-bottom: 15px !important;
+    }
+
+    /* Standardize boxes */
+    .diagnosis-card,
+    .context-text-display,
+    .drug-info,
+    .info-field,
+    .risk-banner {
+        border: 1px solid black !important;
+        background: white !important;
+        color: black !important;
+        padding: 10px !important;
+        margin-bottom: 10px !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+
+    /* Keep risk colors visible for clarity */
+    .risk-banner.critical { border-left: 5px solid red !important; }
+    .risk-banner.high { border-left: 5px solid orange !important; }
+    .risk-banner.moderate { border-left: 5px solid #eab308 !important; }
+    .risk-banner.low { border-left: 5px solid green !important; }
+}

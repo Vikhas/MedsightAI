@@ -36,9 +36,10 @@ MAX_RECONNECT_ATTEMPTS = 10
 class GeminiLiveSession:
     """Manages a Gemini Live API session with auto-reconnect."""
 
-    def __init__(self, api_key: str, send_callback):
+    def __init__(self, api_key: str, send_callback, patient_context: str = ""):
         self.client = genai.Client(api_key=api_key)
         self.send_callback = send_callback
+        self.patient_context = patient_context
         self.session = None
         self._audio_queue: asyncio.Queue = asyncio.Queue(maxsize=50)
         self._video_queue: asyncio.Queue = asyncio.Queue(maxsize=3)
@@ -94,6 +95,12 @@ class GeminiLiveSession:
             )
         ]
 
+        # Build system prompt with optional patient context
+        final_system_prompt = SYSTEM_PROMPT
+        if self.patient_context:
+            logger.info("Injecting patient context into System Prompt.")
+            final_system_prompt += f"\n\n--- CURRENT PATIENT CONTEXT ---\n{self.patient_context}\n-------------------------------"
+
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             speech_config=types.SpeechConfig(
@@ -106,7 +113,7 @@ class GeminiLiveSession:
             input_audio_transcription=types.AudioTranscriptionConfig(),
             output_audio_transcription=types.AudioTranscriptionConfig(),
             system_instruction=types.Content(
-                parts=[types.Part(text=SYSTEM_PROMPT)]
+                parts=[types.Part(text=final_system_prompt)]
             ),
             tools=tools,
         )

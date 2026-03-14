@@ -36,6 +36,14 @@ export class GeminiClient {
             this.ws.onopen = () => {
                 console.log('[GeminiClient] WebSocket connected');
                 this.isConnected = true;
+                
+                // Immediately send the setup message containing any patient context
+                const setupMsg = {
+                    type: "setup",
+                    patient_context: window.currentPatientContext || ""
+                };
+                this.ws.send(JSON.stringify(setupMsg));
+                
                 resolve();
             };
 

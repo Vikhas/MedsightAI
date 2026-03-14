@@ -12,10 +12,13 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from pathlib import Path
+from google import genai
+from google.genai import types
 
 from gemini_live import GeminiLiveSession
 
@@ -51,6 +54,96 @@ async def health():
         "service": "MediSight Backend",
         "gemini_key_configured": bool(os.getenv("GEMINI_API_KEY")),
     }
+
+
+# ---------------------------------------------------------------------------
+# Prescription Extraction API (OCR)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/extract_prescription")
+async def extract_prescription(file: UploadFile = File(...)):
+    """
+    Receives an uploaded prescription image and returns a text summary 
+    of the patient context (name, age, meds, allergies) using Gemini Flash.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"error": "GEMINI_API_KEY not configured."}
+
+    try:
+        image_bytes = await file.read()
+        
+        # Use the standard unary client for OCR
+        client = genai.Client(api_key=api_key)
+        
+        prompt = (
+            "You are a medical assistant extracting information from a patient document/prescription. "
+            "Extract the following into a clean text summary: "
+            "1. Patient Name and Age (if available) "
+            "2. Any known allergies or contraindications "
+            "3. Current medications "
+            "4. Main diagnosis or reason for visit. "
+            "Be concise."
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                prompt,
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=file.content_type or 'image/jpeg',
+                )
+            ]
+        )
+        
+        return {"text": response.text}
+        
+    except Exception as e:
+        logger.error(f"Error extracting prescription: {e}")
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Generate PDF Summary Report (Prescription format)
+# ---------------------------------------------------------------------------
+
+class ReportRequest(BaseModel):
+    transcript: str
+    patient_context: str
+
+@app.post("/api/generate_report")
+async def generate_report(request: ReportRequest):
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return {"error": "GEMINI_API_KEY not configured"}
+
+        client = genai.Client(api_key=api_key)
+        
+        prompt = (
+            "You are an expert clinical AI assistant generating a formal Medical Report / Prescription document.\n"
+            f"Patient Context: {request.patient_context}\n"
+            f"Consultation Transcript: {request.transcript}\n\n"
+            "Create a professional, concise medical report summarizing this consultation based ON THE TRANSCRIPT and PATIENT CONTEXT. "
+            "Format cleanly with the following sections (DO NOT use markdown formatting like ** or *, use HTML tags like <b>, <h3>, <br> if needed, OR plain text with newlines):\n"
+            "PATIENT INFORMATION\n"
+            "CHIEF COMPLAINT / OBSERVATIONS\n"
+            "CLINICAL ASSESSMENT\n"
+            "RECOMMENDED PLAN & PRESCRIPTIONS\n"
+            "WARNINGS / FOLLOW-UP\n"
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        
+        return {"report": response.text}
+        
+    except Exception as e:
+        logger.error(f"Error generating report: {e}")
+        return {"error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -96,10 +189,26 @@ async def websocket_endpoint(ws: WebSocket):
         except Exception as e:
             logger.error("Error sending to browser: %s", e)
 
+    # Wait for initial setup message containing patient context
+    patient_context = ""
+    try:
+        raw_setup = await ws.receive_text()
+        setup_msg = json.loads(raw_setup)
+        if setup_msg.get("type") == "setup":
+            patient_context = setup_msg.get("patient_context", "")
+            logger.info("Received setup message with patient context.")
+        else:
+            logger.warning(f"Expected setup message, got {setup_msg.get('type')}")
+    except Exception as e:
+        logger.error(f"Error reading setup message: {e}")
+        await ws.close()
+        return
+
     # Create Gemini session
     gemini_session = GeminiLiveSession(
         api_key=api_key,
         send_callback=send_to_browser,
+        patient_context=patient_context,
     )
 
     # Start Gemini session in background

@@ -11,6 +11,62 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+    <!-- Doctor Login Overlay -->
+    <div id="loginOverlay" class="modal-overlay">
+        <div class="modal-content login-modal">
+            <div class="modal-header">
+                <h2>MediSight Portal</h2>
+            </div>
+            <div class="modal-body">
+                <p>Please authenticate to access the live clinical decision assistant.</p>
+                <div class="input-group">
+                    <label for="doctorName">Provider Name</label>
+                    <input type="text" id="doctorName" placeholder="Dr. Smith" required />
+                </div>
+                <div class="input-group">
+                    <label for="doctorPin">Access PIN</label>
+                    <input type="password" id="doctorPin" placeholder="••••" required />
+                </div>
+                <button id="loginBtn" class="primary-btn">Authenticate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Setup Modal -->
+    <div id="patientSetupModal" class="modal-overlay hidden">
+        <div class="modal-content setup-modal">
+            <div class="modal-header">
+                <h2>Patient Context</h2>
+            </div>
+            <div class="modal-body">
+                <p>Upload a recent prescription or clinical note. The AI will read this prior to the live video analysis.</p>
+                
+                <div class="upload-area" id="uploadArea">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    <span id="uploadText">Click to upload prescription (Image/PDF)</span>
+                    <input type="file" id="prescriptionFile" accept="image/*" class="hidden-input" />
+                </div>
+
+                <div id="ocrLoading" class="ocr-loading hidden">
+                    <div class="spinner small"></div>
+                    <span>Extracting medical history with Gemini 2.5 Flash...</span>
+                </div>
+
+                <div id="contextPreview" class="context-preview hidden">
+                    <h3>Extracted Context</h3>
+                    <textarea id="patientContextText" rows="4"></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="skipSetupBtn" class="secondary-btn">Skip</button>
+                    <button id="startSessionBtn" class="primary-btn" disabled>Start Session</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Top Navigation Bar -->
     <header id="header" class="header">
         <div class="header-left">
@@ -152,8 +208,22 @@
                     </svg>
                     Clinical Insights
                 </div>
+                <div class="panel-actions">
+                    <button id="exportReportBtn" class="small-btn hidden" title="Export PDF Report" aria-label="Export Report">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div id="insightsContent" class="insights-content">
+                <!-- Active Patient Context -->
+                <div id="activeContextSection" class="insight-section hidden">
+                    <h3 class="section-title">Active Patient Context</h3>
+                    <div id="activeContextText" class="context-text-display"></div>
+                </div>
                 <!-- Risk Level Banner -->
                 <div id="riskBanner" class="risk-banner hidden">
                     <div class="risk-level">
