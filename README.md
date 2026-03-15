@@ -19,7 +19,6 @@
 - [Getting Started](#-getting-started)
 - [Deploying to Google Cloud](#-deploying-to-google-cloud)
 - [Google Cloud Services Used](#-google-cloud-services-used)
-- [Hackathon Requirements Checklist](#-hackathon-requirements-checklist)
 - [Project Structure](#-project-structure)
 
 ---
@@ -207,19 +206,6 @@ export GEMINI_API_KEY=your_key_here
 chmod +x infrastructure/deploy.sh
 ./infrastructure/deploy.sh my-project-id us-central1
 ```
-
----
-
-## ✅ Hackathon Requirements Checklist
-
-| Requirement | Status | Implementation |
-|-------------|--------|---------------|
-| Uses a Gemini model | ✅ | `gemini-2.5-flash-native-audio-latest` |
-| Uses Gemini Live API | ✅ | Real-time WebSocket session via `google-genai` SDK |
-| Uses Google Cloud service | ✅ | Cloud Run, Cloud Build, Artifact Registry |
-| Multimodal interaction | ✅ | Voice + Vision + Images + AI speech output |
-| Supports interruption | ✅ | Built-in Gemini Live API barge-in support |
-| Backend on Google Cloud | ✅ | Deployed on Cloud Run |
 
 ---
 
