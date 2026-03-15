@@ -1,4 +1,4 @@
-# 🏥 MediSight — Real-Time Clinical Decision Assistant
+# 🏥 MedsightAI — Real-Time Clinical Decision Assistant
 
 > **Gemini Live Agent Challenge Hackathon** — A multimodal AI assistant that helps doctors analyze patient symptoms during rounds using voice and vision.
 
@@ -30,7 +30,7 @@ During hospital rounds, physicians must rapidly assess patient symptoms, recall 
 
 ## 💡 Solution
 
-**MediSight** is a real-time clinical decision support assistant powered by **Gemini Live API**. A doctor opens the web app and:
+**MedsightAI** is a real-time clinical decision support assistant powered by **Gemini Live API**. A doctor opens the web app and:
 
 1. 🗣️ **Speaks** to the AI assistant naturally
 2. 📸 **Shows** symptoms (rash, wound, X-ray) through the webcam
@@ -44,52 +44,41 @@ The AI provides differential diagnoses, severity assessments, drug interaction c
 
 ## 🏗️ Architecture
 
-## 🏗️ Architecture
+```mermaid
+graph TD
+    subgraph Client ["Browser (Web App)"]
+        UI["UI (Vanilla JS)"]
+        Mic["Mic (PCM Audio)"]
+        Cam["Webcam (JPEG)"]
+        Insights["Clinical Insights Panel"]
+    end
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Browser (Web App)                 │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
-│  │ Webcam   │  │ Mic      │  │ Clinical Insights  │  │
-│  │ (JPEG)   │  │ (PCM     │  │ & PDF Exporter     │  │
-│  │          │  │  16kHz)  │  │                    │  │
-│  └────┬─────┘  └────┬─────┘  └───────────▲────────┘  │
-│       │              │                    │           │
-│       └──────┬───────┘                    │           │
-│              ▼                            │           │
-│       ┌──────────────┐             ┌──────▼───────┐   │
-│       │  WebSocket   │◄────────────┤ REST API     │   │
-│       │  Client      │             │  Clients     │   │
-│       └──────┬───────┘             └──────┬───────┘   │
-└──────────────┼────────────────────────────┼───────────┘
-               │ WebSocket (wss://)         │ HTTP (POST)
-               │                            │
-               ▼                            ▼
-┌──────────────────────────────────────────────────────┐
-│           FastAPI Backend (Cloud Run)                 │
-│  ┌───────────────────────────────────────────────┐   │
-│  │              WebSocket Proxy                   │   │
-│  └──────────────────┬────────────────────────────┘   │
-│                     │                                 │
-│  ┌──────────────────▼────────────────────────────┐   │
-│  │          GeminiLiveSession                     │   │
-│  │  ┌─────────────┐  ┌────────────────────────┐  │   │
-│  │  │ google-genai │  │ Tool Call Handler       │  │   │
-│  │  │ SDK          │  │ (agent_tools.py)        │  │   │
-│  │  └──────┬──────┘  └──────────┬─────────────┘  │   │
-│  └─────────┼────────────────────┼────────────────┘   │
-│            │                    │                     │
-│  ┌─────────▼────────────────────▼───────────────┐    │
-│  │         OCR & Report Generators (REST)       │◄───┘
-│  └──────────────────┬───────────────────────────┘    │
-└─────────────────────┼────────────────────────────────┘
-                      │
-                      ▼
-    ┌─────────────────┴───────────────┐
-    │          Gemini APIs            │
-    │ • gemini-2.5-flash-native-audio │
-    │ • gemini-2.5-flash (OCR/Reports)│
-    └─────────────────────────────────┘
+    subgraph Backend ["FastAPI Backend (Cloud Run)"]
+        Proxy["WebSocket Proxy"]
+        GS["Gemini Live Session"]
+        Tools["agent_tools.py"]
+        OCR["OCR & Report Engine"]
+    end
+
+    subgraph Google ["Google Cloud & Gemini"]
+        GLA["Gemini Live API (2.5 Flash Audio)"]
+        VAI["Gemini 2.5 Flash (Symptom/OCR)"]
+    end
+
+    subgraph Ext ["External Services"]
+        FDA["OpenFDA API"]
+    end
+
+    Mic -->|Audio Binary| Proxy
+    Cam -->|JPEG Frames| Proxy
+    Proxy <--> GS
+    GS <-->|Bidirectional Stream| GLA
+    GS --> Tools
+    Tools -->|Differential Diagnosis| VAI
+    Tools -->|Drug Interactions| FDA
+    GS --> OCR
+    OCR -->|Medical Reports| Insights
+    Insights -.-> UI
 ```
 
 ---
@@ -118,25 +107,24 @@ The AI provides differential diagnoses, severity assessments, drug interaction c
 - 🔊 **Voice output** — AI responds with natural speech
 - ⚡ **Barge-in** — interrupt the AI at any time
 
-### 🚀 The "Beyond Text" Factor (Hackathon Alignment)
-This project breaks the "text box" paradigm completely. It acts as a **true Live Agent** for clinical environments where hands are often sterilized or busy. The interaction is fully natural:
+### 🚀 The "Beyond Text" Factor
+This project breaks the "text box" paradigm. It acts as a **true Live Agent** for clinical environments where hands are often sterilized or busy. The interaction is fully natural:
 - The agent "Sees, Hears, and Speaks" via Gemini's multimodal Live API.
 - Interruptions (barge-in) are handled gracefully (e.g., "Wait, they are allergic to penicillin").
 - Seamlessly weaves real-time video observation with medical fact-checking.
 
 ### Clinical Agent Tools
-- 🔬 **Symptom Analysis** — differential diagnoses from visual observation
-- 💊 **Drug Interactions** — safety checks with allergy awareness
-- 📋 **Clinical Guidelines** — evidence-based treatment protocols
-- ⚠️ **Risk Assessment** — severity scoring with triage recommendations
-- 📄 **Prescription OCR** — Upload past slips; Gemini reads the handwriting and injects it as context.
-- 🖨️ **Automated PDF Reports** — At the end of the session, the app summarizes the live audio transcript into a cleanly formatted, printable clinical prescription.
+- 🔬 **Symptom Analysis** — differential diagnoses from visual observation via Gemini Vision.
+- 💊 **Drug Interactions** — safety checks leveraging the **OpenFDA API**.
+- 📋 **Clinical Guidelines** — evidence-based treatment protocols for 12+ major conditions.
+- ⚠️ **Risk Assessment** — validated **NEWS2** (National Early Warning Score 2) calculation.
+- 📄 **Prescription OCR** — Multi-modal insight from handwritten medical slips.
+- 🖨️ **Automated PDF Reports** — summarized clinical prescriptions generated from live audio transcripts.
 
 ### Premium UI
-- 🌙 Dark medical theme with glassmorphism
-- 📊 Real-time confidence bars for diagnoses
-- 💬 Concurrent streaming bubbles for Doctor & AI transcripts
-- 🖨️ Zero-click print stylesheets (Converts to Medical Letterhead on PDF export)
+- 🌙 Dark medical theme with glassmorphism.
+- 💬 Concurrent streaming bubbles for Doctor & AI transcripts.
+- 🖨️ Optimized print stylesheets for medical letterhead export.
 
 ---
 
@@ -144,34 +132,24 @@ This project breaks the "text box" paradigm completely. It acts as a **true Live
 
 ### Scene 1: Visual Symptom Analysis
 
-> **Doctor** opens MediSight and points the webcam at a rash.
+> **Doctor** opens MedsightAI and points the webcam at a rash.
 >
-> **Doctor**: *"MediSight, what do you think about this rash on the patient's forearm?"*
+> **Doctor**: *"MedsightAI, what do you think about this rash on the patient's forearm?"*
 >
-> **MediSight**: *"I can see what appears to be an erythematous, raised rash on the forearm. Let me run an analysis..."*
+> **MedsightAI**: *"I can see what appears to be an erythematous, raised rash on the forearm. Let me run an analysis..."*
 >
 > The Clinical Insights panel populates with:
 > - **Contact Dermatitis** — 75% confidence
 > - **Cellulitis** — 60% confidence
-> - **Allergic Reaction** — 55% confidence
 > - Recommended tests: Skin biopsy, CBC, IgE levels
-> - ⚠️ Warning: Watch for rapid spreading, fever
 
 ### Scene 2: Drug Interaction Check (Interruption)
 
 > **Doctor** interrupts: *"Wait — the patient is allergic to penicillin. What antibiotics are safe?"*
 >
-> MediSight immediately stops speaking and responds:
+> MedsightAI immediately stops speaking and responds:
 >
-> **MediSight**: *"Given the penicillin allergy, amoxicillin is contraindicated. Safe alternatives include azithromycin, doxycycline, or trimethoprim-sulfamethoxazole..."*
->
-> The Drug Safety panel shows: **✕ CONTRAINDICATED** for Amoxicillin with alternatives listed.
-
-### Scene 3: Clinical Guidelines
-
-> **Doctor**: *"What are the current guidelines for treating cellulitis?"*
->
-> **MediSight**: *"According to IDSA 2024 guidelines, first-line treatment for cellulitis is Cephalexin 500mg orally four times daily for 7 to 10 days. For penicillin-allergic patients, Clindamycin 300mg three times daily is recommended..."*
+> **MedsightAI**: *"Given the penicillin allergy, amoxicillin is contraindicated. Safe alternatives include azithromycin, doxycycline, or trimethoprim-sulfamethoxazole..."*
 
 ---
 
@@ -185,8 +163,8 @@ This project breaks the "text box" paradigm completely. It acts as a **true Live
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/medisight.git
-cd medisight
+git clone https://github.com/YOUR_USERNAME/medsight-ai.git
+cd medsight-ai
 ```
 
 ### 2. Set up the backend
@@ -197,35 +175,21 @@ cd backend
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Set your API key
+# Set your API key in .env
 cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
 ```
 
 ### 3. Run locally
 
 ```bash
-# From the backend/ directory
 python main.py
 ```
 
-### 4. Open the app
-
 Navigate to **http://localhost:8000** in your browser.
-
-> **Note:** HTTPS is required for camera/microphone access in production. Localhost is exempt from this requirement during development.
-
-### 5. Use MediSight
-
-1. Click **Connect** to start the session
-2. Grant camera and microphone permissions
-3. Speak to the AI or type a message
-4. Show symptoms via webcam for visual analysis
 
 ---
 
@@ -235,50 +199,14 @@ Navigate to **http://localhost:8000** in your browser.
 
 - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) installed
 - A GCP project with billing enabled
-- `GEMINI_API_KEY` environment variable set
 
 ### Deploy with the script
 
 ```bash
-# Set your API key
 export GEMINI_API_KEY=your_key_here
-
-# Deploy (uses current gcloud project)
 chmod +x infrastructure/deploy.sh
-./infrastructure/deploy.sh
-
-# Or specify project and region
 ./infrastructure/deploy.sh my-project-id us-central1
 ```
-
-### Deploy manually
-
-```bash
-# Build and push container
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/medisight
-
-# Deploy to Cloud Run
-gcloud run deploy medisight \
-    --image gcr.io/YOUR_PROJECT_ID/medisight \
-    --platform managed \
-    --region us-central1 \
-    --allow-unauthenticated \
-    --set-env-vars "GEMINI_API_KEY=${GEMINI_API_KEY}" \
-    --memory 1Gi \
-    --timeout 3600 \
-    --port 8080
-```
-
----
-
-## 🌐 Google Cloud Services Used
-
-| Service | Purpose |
-|---------|---------|
-| **Cloud Run** | Hosts the FastAPI backend with auto-scaling |
-| **Cloud Build** | CI/CD pipeline for container builds |
-| **Container Registry** | Stores the Docker container image |
-| **Vertex AI** | Gemini model access via Google AI Studio |
 
 ---
 
@@ -286,50 +214,32 @@ gcloud run deploy medisight \
 
 | Requirement | Status | Implementation |
 |-------------|--------|---------------|
-| Uses a Gemini model | ✅ | `gemini-2.5-flash-native-audio-latest` & `gemini-2.5-flash` |
+| Uses a Gemini model | ✅ | `gemini-2.5-flash-native-audio-latest` |
 | Uses Gemini Live API | ✅ | Real-time WebSocket session via `google-genai` SDK |
-| Uses Google GenAI SDK | ✅ | `google-genai` Python SDK for session and REST OCR management |
-| Uses Google Cloud service | ✅ | Cloud Run, Cloud Build, Container Registry |
-| Multimodal interaction | ✅ | Voice (mic) + Vision (webcam) + Images (uploads) + AI speech output |
-| Live Agent with natural speech | ✅ | Full-duplex audio conversation |
-| Supports interruption (barge-in) | ✅ | Built-in Gemini Live API barge-in support |
-| Backend hosted on Google Cloud | ✅ | Deployed on Cloud Run serving the frontend static files |
-| New project for hackathon | ✅ | Built entirely from scratch |
-
-### Proof of Google Cloud Deployment
-Inside our repository, the `infrastructure/cloudbuild.yaml` and `infrastructure/deploy.sh` files demonstrate our automated deployment process directly to Google Cloud Run. The live demo is hosted on a GCP Cloud Run HTTPS endpoint. 
-
-### Demonstration Video
-*(Hackathon note: Include your max 4-minute YouTube/Vimeo video here showcasing the Live Agent features without mockups).*
+| Uses Google Cloud service | ✅ | Cloud Run, Cloud Build, Artifact Registry |
+| Multimodal interaction | ✅ | Voice + Vision + Images + AI speech output |
+| Supports interruption | ✅ | Built-in Gemini Live API barge-in support |
+| Backend on Google Cloud | ✅ | Deployed on Cloud Run |
 
 ---
 
 ## 📁 Project Structure
 
 ```
-medisight/
+medsight-ai/
 ├── backend/
-│   ├── main.py              # FastAPI server + WebSocket endpoint
-│   ├── gemini_live.py        # Gemini Live API session wrapper
-│   ├── agent_tools.py        # Clinical reasoning tool functions
+│   ├── main.py              # FastAPI server
+│   ├── gemini_live.py        # Gemini Live API wrapper
+│   ├── agent_tools.py        # Clinical reasoning tools (NEWS2, OpenFDA)
 │   ├── requirements.txt      # Python dependencies
-│   └── .env.example          # Environment variable template
 ├── frontend/
 │   ├── index.html            # Main web page
-│   ├── css/
-│   │   └── styles.css        # Premium dark medical theme
-│   └── js/
-│       ├── main.js           # Application controller
-│       ├── gemini-client.js  # WebSocket client
-│       ├── media-handler.js  # Audio/video capture & playback
-│       └── pcm-processor.js  # AudioWorklet for PCM audio
+│   ├── css/styles.css        # Premium dark theme
+│   └── js/                   # WebSocket & Media handlers
 ├── prompts/
-│   └── system_prompt.txt     # MediSight clinical system prompt
-├── infrastructure/
-│   ├── deploy.sh             # Cloud Run deployment script
-│   └── cloudbuild.yaml       # Cloud Build CI/CD config
+│   └── system_prompt.txt     # Clinical system prompt
+├── infrastructure/           # Cloud Run & Build configs
 ├── Dockerfile                # Container definition
-├── .gitignore
 └── README.md
 ```
 
@@ -337,7 +247,7 @@ medisight/
 
 ## ⚖️ Disclaimer
 
-MediSight is a **demonstration project** built for the Gemini Live Agent Challenge hackathon. It is **not** a certified medical device and should **not** be used for actual clinical decision-making. All clinical tool responses are mock implementations for demonstration purposes.
+MedsightAI is a **demonstration project** built for the Gemini Live Agent Challenge hackathon. It is **not** a certified medical device and should **not** be used for actual clinical decision-making.
 
 ---
 
